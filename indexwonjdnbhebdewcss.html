@@ -10,6 +10,25 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Star Forward スターフォワード</title>
 <style>
+@keyframes shooting-star {
+    0% { transform: translate(0, 0) rotate(45deg); opacity: 0; }
+    10% { opacity: 1; }
+    20% { transform: translate(200px, 200px) rotate(45deg); opacity: 0; }
+    100% { opacity: 0; }
+}
+.star {
+    position: absolute;
+    width: 2px; height: 100px;
+    background: linear-gradient(to bottom, #fff, transparent);
+    animation: shooting-star 8s linear infinite;
+    z-index: 11;
+}
+@keyframes title-anim {
+    0% { transform: scale(1) rotate(0deg); filter: brightness(1) saturate(1); }
+    50% { transform: scale(1.05) rotate(1deg); filter: brightness(1.2) saturate(1.2); }
+    100% { transform: scale(1) rotate(0deg); filter: brightness(1) saturate(1); }
+}
+.bg-anim { animation: title-anim 15s ease-in-out infinite; }
 html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#000}
 canvas{display:block;width:100%;height:100%}
 .bg-img {
@@ -50,7 +69,21 @@ canvas{display:block;width:100%;height:100%}
     transform: translate(-50%, -45%);
     box-shadow: 0 1px 0 #000;
 }
-
+/* 戻るボタン */
+#back-btn {
+    position: absolute; top: 20px; right: 20px; z-index: 100;
+    width: 50px; height: 50px; cursor: pointer; display: none;
+    background: linear-gradient(135deg, #555 0%, #222 50%, #000 100%);
+    border: 2px solid #aaa; border-radius: 8px;
+    box-shadow: 2px 2px 5px #000;
+}
+#back-btn::after {
+    content: ""; position: absolute; left: 18px; top: 12px;
+    width: 20px; height: 20px;
+    border-top: 4px solid #fff; border-right: 4px solid #fff;
+    transform: rotate(-135deg);
+}
+#back-btn:active { background: #333; transform: scale(0.95); }
 /* スマホ縦型環境用：サイズと位置を調整 */
 @media (orientation: portrait) {
     #start-btn {
@@ -74,10 +107,12 @@ canvas{display:block;width:100%;height:100%}
         PLEASE TOUCH<br>OR PRESS ANY KEY
     </div>
 </div>
-
+<div id="back-btn" onclick="location.reload()"></div>
 <div id="title-modal" style="position:absolute;top:0;left:0;width:100%;height:100%;display:flex;justify-content:center;align-items:center;z-index:10;">
-    <div id="bg-landscape" class="bg-img" style="background:url('./img/logo_wide.jpg') center/cover no-repeat;"></div>
-    <div id="bg-portrait" class="bg-img" style="background:url('./img/logo_tall.jpg') center/cover no-repeat;"></div>
+	<div class="star" style="top:10%; left:20%; animation-delay: 2s;"></div>
+    <div class="star" style="top:40%; left:60%; animation-delay: 5s;"></div>
+    <div id="bg-landscape" class="bg-img bg-anim" style="background:url('./img/logo_wide.jpg') center/cover no-repeat;"></div>
+    <div id="bg-portrait" class="bg-img bg-anim" style="background:url('./img/logo_tall.jpg') center/cover no-repeat;"></div>
 	<button id="start-btn" onclick="startGame()">
 	    START GAME
 	</button>
@@ -100,10 +135,11 @@ const game={
 	startTime:Date.now(),
 	finalElapsedSec:0,
     distance:0,
+    specialStarsFound:[], // スペシャル星収集
     replayLog:[], // リプレイ用のカメラログ
     mode:"playing", // playing / replay
     lostFrames: 0, // 画面外滞在フレーム数カウンター
-    isInvincible: false, // 無敵モードフラグ
+    isSubspace: false, // 無敵モードフラグ
     alertTimer:0, // 異色星の赤アラート用
     alertStar:null, // 異色星の赤アラート用
     gameOverMessage:"",
@@ -133,7 +169,7 @@ const IMAGE_CONFIG = [
     { start: 1000000, end: 1200000, src: "img/img_007.png" }
 ];
 
-//特定の星画像
+//特定の星のIDと画像
 const SPECIAL_STARS_CONFIG = {
     3999: "./img/id3999.png",
     500:  "./img/id500.png",
@@ -148,7 +184,7 @@ const BG_OPACITY = 0.6;       //背景の基本透過率（0.0透明～1.0不透
 const PARALLAX_STRENGTH = 50; // 背景の視差効果：カメラ旋回時の背景のズレ量（0:固定、20-50:控えめ標準、100+:激しい）
 
 // --- 操作・移動関連の定数 ---
-const SCROLL_SPEED = 50;        // 基本スクロール速度。標準:50
+const SCROLL_SPEED = 10;        // 基本スクロール速度。標準:50
 const INITIAL_SPEED_MULT = 1.0; // 初期速度倍率
 const ROT_SPEED = 0.2;          // 回転速度: 視点の旋回速度。値を大きくすると操作が機敏になります
 const MOVE_SPEED = 100;         // 基本移動速度: 宇宙をZ/Xキーで移動するベースの速度
@@ -204,6 +240,7 @@ function trySelectStar(mx, my){
     if(!s) return;
     // すでに固定化（lineIdがnullでない）された星は選択できない
     if(s.lineId !== null) return;
+    if(s.isSpecial && !game.specialStarsFound.includes(s.id)) game.specialStarsFound.push(s.id);
 
     // 現在操作中の星（selectedStars）に対する解除処理
     const i=game.selectedStars.indexOf(s);
@@ -238,7 +275,7 @@ function trySelectStar(mx, my){
 }
 
 addEventListener("keydown",e=>{
-    if(e.code==="KeyI") game.isInvincible=!game.isInvincible;
+    if(e.code==="KeyI") game.isSubspace=!game.isSubspace;
     if(e.code==="Space") trySelectStar();
 });
 
@@ -316,7 +353,7 @@ function update(dt){
 	applyBoost();
 	
 	// ゲームオーバー判定①：既存ラインの末端星が視界外ならゲームオーバー
-	if(!game.isInvincible && (game.lines.length > 0 || game.selectedStars.length > 0)){
+	if(!game.isSubspace && (game.lines.length > 0 || game.selectedStars.length > 0)){
 		let lastStar = null;
 
 		if(game.selectedStars.length > 0){
@@ -373,7 +410,7 @@ function update(dt){
 		if(collisionFound) break;
 	}
 
-	if(collisionFound && !game.isInvincible){
+	if(collisionFound && !game.isSubspace){
 		game.collisionFrames++;
 		// ゲームオーバー判定①：指定フレーム数分の交差が続いたらゲームオーバー
 		if(game.collisionFrames > COLLISION_THRESHOLD){
@@ -625,8 +662,9 @@ function render(t){
 	drawMetalText(`${elapsed} DAYS`,20,40); //ゲーム内での日数（実時間での秒数）
 	drawMetalText(`${game.distance * 100 | 0} LIGHT YEARS`,20,70); //光年（航行した総距離 * 100）※外連味で100倍している
 	drawMetalText(`${game.lines.length} STAR LINES`,20,100); //星系（リンク数）
+	drawMetalText(`${game.specialStarsFound.length} / ${Object.keys(SPECIAL_STARS_CONFIG).length} SPECIAL STARS`,20,130); //スペシャル星収集
 
-	//「20,140」はネガティブイベント表示に使う
+	//「20,170」はネガティブイベント表示に使う
 	if(game.alertTimer>0){
 	    const visible=
 	        game.alertTimer>=21 ||
@@ -634,25 +672,25 @@ function render(t){
 
 	    if(visible){
 	        ctx.fillStyle="#ff0000";
-	        ctx.fillText("UNPLANNED SWING-BY!",20,140);
+	        ctx.fillText("UNPLANNED SWING-BY!",20,170);
 	    }
 	}
 	
 	if(game.gameOverTimer>0){
 	    ctx.fillStyle="#ff0000";
-	    ctx.fillText(game.gameOverMessage,20,140); //ゲームオーバー①②メッセージ
+	    ctx.fillText(game.gameOverMessage,20,170); //ゲームオーバー①②メッセージ
 	}
 
 	// リプレイ表示
 	if(game.mode === "replay"){
 		ctx.fillStyle = "#ffff00";
-		ctx.fillText("REPLAYING...", 20, 170);
+		ctx.fillText("REPLAYING...", 20, 200);
 	}
 
-	// 無敵モード
-	if(game.isInvincible){
+	// 無敵（亜空間）モード
+	if(game.isSubspace){
 		ctx.fillStyle = "#ffff00";
-		ctx.fillText("INVINCIBLE MODE: ON", 20, 200);
+		ctx.fillText("SUBSPACE MODE: ON", 20, 230);
 	}
 
 	// 確定済みラインの描画
@@ -824,6 +862,7 @@ loadImages();
 function hideGuide(){ document.getElementById("guide-layer").style.display = "none"; }
 function startGame(){ 
     document.getElementById("title-modal").style.display = "none";
+    document.getElementById("back-btn").style.display = "block";
     game.started = true;
 }
 addEventListener("keydown",e=>{
@@ -843,7 +882,7 @@ canvas.addEventListener("pointerdown", (e) => {
         const rect = canvas.getBoundingClientRect();
         const x = e.clientX - rect.left, y = e.clientY - rect.top;
         // 無敵隠しボタン判定：LIGHT YEARS (20, 70) の2文字目 'I' 付近
-        if (x > 30 && x < 50 && y > 70 && y < 90) game.isInvincible = !game.isInvincible;
+        if (x > 30 && x < 50 && y > 70 && y < 90) game.isSubspace = !game.isSubspace;
         trySelectStar(x, y);
     }
 }, {passive: false});
@@ -975,6 +1014,7 @@ function createStars(){
         }
 
 		game.stars.push({
+			id:i, //スペシャル星収集用
             x,y,z,
             radius:1+mag*3,
             size,
