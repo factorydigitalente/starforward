@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!-- Star Forward スターフォワード -->
-<!-- ver20260622 -->
+<!-- ver20260624 -->
 <!-- Copyright (C) 2026 Factory Digital Entertainment and Hironov Yazaki. -->
 <!-- このゲーム及び、ゲーム内の使用楽曲の著作権は全て、ファクトリー・デジタル・エンターテインメント、矢崎大信が有します。 -->
 <!-- 上記の著作権者に無断で、これらの著作物を出版・放送・演奏・複製・公開に使用することを禁じます。 -->
@@ -64,7 +64,10 @@ canvas{display:block;width:100%;height:100%}
 </head>
 <body>
 <canvas id="game"></canvas>
-<canvas id="minimap" style="position:absolute;bottom:20px;left:20px;width:150px;height:150px;border:1px solid #fff;background:rgba(0,0,0,0.5)"></canvas>
+<canvas id="minimap" style="position:absolute;bottom:20px;left:20px;width:150px;height:150px;border:1px solid #fff;background:rgba(0,0,0,0.5);z-index:1;"></canvas>
+<div id="pad-area" style="position:absolute;bottom:20px;left:20px;width:150px;height:150px;z-index:5;"></div>
+<div id="z-btn" style="position:absolute;bottom:0;left:180px;width:calc(50% - 90px);height:80px;display:flex;justify-content:center;align-items:center;color:rgba(255,255,255,0);font-size:2em;font-weight:bold;z-index:5;user-select:none;touch-action:none;-webkit-tap-highlight-color:transparent;">Z</div>
+<div id="x-btn" style="position:absolute;bottom:0;right:0;width:calc(50% - 90px);height:80px;display:flex;justify-content:center;align-items:center;color:rgba(255,255,255,0);font-size:2em;font-weight:bold;z-index:5;user-select:none;touch-action:none;-webkit-tap-highlight-color:transparent;">X</div>
 
 <div id="guide-layer" style="position:absolute;top:0;left:0;width:100%;height:100%;display:flex;justify-content:center;align-items:center;z-index:20;background:rgba(0,0,0,0.8);cursor:pointer;" onclick="hideGuide()">
     <div style="color:#fff;font-family:Arial,sans-serif;font-weight:bold;font-size:1.5em;text-align:center;animation:blink 5s infinite;">
@@ -753,7 +756,10 @@ canvas.addEventListener("pointerdown", (e) => {
     e.preventDefault();
     if(document.getElementById("guide-layer").style.display === "none") {
         const rect = canvas.getBoundingClientRect();
-        trySelectStar(e.clientX - rect.left, e.clientY - rect.top);
+        const x = e.clientX - rect.left, y = e.clientY - rect.top;
+        // 無敵隠しボタン判定：LIGHT YEARS (20, 70) の2文字目 'I' 付近
+        if (x > 30 && x < 50 && y > 70 && y < 90) game.isInvincible = !game.isInvincible;
+        trySelectStar(x, y);
     }
 }, {passive: false});
 canvas.addEventListener("touchstart", (e) => {
@@ -762,6 +768,52 @@ canvas.addEventListener("touchstart", (e) => {
         trySelectStar();
     }
 }, {passive: false}); // passiveをfalseに設定
+
+//アナログパッド
+const pad = document.getElementById("pad-area");
+const updatePad = (e) => {
+    e.preventDefault();
+    const rect = pad.getBoundingClientRect();
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    const dx = clientX - (rect.left + rect.width / 2);
+    const dy = clientY - (rect.top + rect.height / 2);
+    const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+    keys.ArrowUp = keys.ArrowDown = keys.ArrowLeft = keys.ArrowRight = 0;
+    if(angle > -157.5 && angle < -22.5) keys.ArrowUp = 1;
+    if(angle > 22.5 && angle < 157.5) keys.ArrowDown = 1;
+    if(angle > -67.5 && angle < 67.5) keys.ArrowRight = 1;
+    if(angle > 112.5 || angle < -112.5) keys.ArrowLeft = 1;
+    pad.style.background = "rgba(255,255,255,0.2)";
+};
+pad.addEventListener("touchstart", updatePad, {passive: false});
+pad.addEventListener("touchmove", updatePad, {passive: false});
+pad.addEventListener("mousedown", (e) => {
+    pad.addEventListener("mousemove", updatePad);
+    updatePad(e);
+});
+window.addEventListener("mouseup", () => {
+    pad.removeEventListener("mousemove", updatePad);
+    keys.ArrowUp = keys.ArrowDown = keys.ArrowLeft = keys.ArrowRight = 0;
+    pad.style.background = "transparent";
+});
+pad.addEventListener("touchend", () => {
+    keys.ArrowUp = keys.ArrowDown = keys.ArrowLeft = keys.ArrowRight = 0;
+    pad.style.background = "transparent";
+});
+
+// Z・Xキーパッド
+const zBtn = document.getElementById("z-btn");
+const xBtn = document.getElementById("x-btn");
+const setKey = (code, val, el) => {
+    keys[code] = val;
+    el.style.color = val ? "rgba(255,255,255,0.5)" : "rgba(255,255,255,0)";
+    el.style.background = val ? "rgba(255,255,255,0.2)" : "transparent";
+};
+zBtn.addEventListener("pointerdown", () => setKey("KeyZ", 1, zBtn));
+window.addEventListener("pointerup", () => setKey("KeyZ", 0, zBtn));
+xBtn.addEventListener("pointerdown", () => setKey("KeyX", 1, xBtn));
+window.addEventListener("pointerup", () => setKey("KeyX", 0, xBtn));
 
 
 //クリック・タップ地点の近くの星を特定する処理
