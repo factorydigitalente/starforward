@@ -103,7 +103,11 @@ const game={
     replayLog:[], // リプレイ用のカメラログ
     mode:"playing", // playing / replay
     lostFrames: 0, // 画面外滞在フレーム数カウンター
-    isInvincible: false // 無敵モードフラグ
+    isInvincible: false, // 無敵モードフラグ
+    alertTimer:0, // 異色星の赤アラート用
+    alertStar:null, // 異色星の赤アラート用
+    gameOverMessage:"",
+	gameOverTimer:0
 };
 const keys={};
 let speedMultiplier=1.0;
@@ -129,20 +133,29 @@ const IMAGE_CONFIG = [
     { start: 1000000, end: 1200000, src: "img/img_007.png" }
 ];
 
-const START_SCALE = 1.2;        //背景の開始時の大きさ。値を大きくすると、現れた時点ですでに大きい状態から始まります。標準:1
-const EXPANSION_SPEED = 1;  //背景の拡大幅。小さくするほど、ゆっくりと拡大します。標準:1.2
+//特定の星画像
+const SPECIAL_STARS_CONFIG = {
+    3999: "./img/id3999.png",
+    500:  "./img/id500.png",
+    1500: "./img/id1500.png",
+    2500: "./img/id2500.png"
+};
+
+const START_SCALE = 1.2;      //背景の開始時の大きさ。値を大きくすると、現れた時点ですでに大きい状態から始まります。標準:1
+const EXPANSION_SPEED = 1;    //背景の拡大幅。小さくするほど、ゆっくりと拡大します。標準:1.2
 const ROTATION_SPEED = 0.07;  //背景の回転率。値を大きくすると、拡大しながらより速く回転します。
 const BG_OPACITY = 0.6;       //背景の基本透過率（0.0透明～1.0不透明）。
 const PARALLAX_STRENGTH = 50; // 背景の視差効果：カメラ旋回時の背景のズレ量（0:固定、20-50:控えめ標準、100+:激しい）
 
 // --- 操作・移動関連の定数 ---
-const SCROLL_SPEED = 50;       // 基本スクロール速度。標準:50
+const SCROLL_SPEED = 50;        // 基本スクロール速度。標準:50
 const INITIAL_SPEED_MULT = 1.0; // 初期速度倍率
-const ROT_SPEED = 0.2;      // 回転速度: 視点の旋回速度。値を大きくすると操作が機敏になります
-const MOVE_SPEED = 100;     // 基本移動速度: 宇宙をZ/Xキーで移動するベースの速度
-const BOOST_MULT = 2;       // ブースト倍率: Z/Xキー押下時の加速係数（基本速度 × 本値）
-const MIN_SPEED = 0.5;      // 最小速度倍率: 星を接続する際の下限速度
-const SPEED_STEP = 0.2;     // 加速ステップ: 星を1つ繋ぐごとに加算される速度倍率
+const ROT_SPEED = 0.2;          // 回転速度: 視点の旋回速度。値を大きくすると操作が機敏になります
+const MOVE_SPEED = 100;         // 基本移動速度: 宇宙をZ/Xキーで移動するベースの速度
+const BOOST_MULT = 2;           // ブースト倍率: Z/Xキー押下時の加速係数（基本速度 × 本値）
+const MIN_SPEED = 0.5;          // 最小速度倍率: 星を接続する際の下限速度
+const SPEED_STEP = 0.2;         // 加速ステップ: 星を1つ繋ぐごとに加算される速度倍率
+const MAX_VISIBLE_LINES = 10;   // 表示を残しておく最新のラインの本数。少ないと交差ゲームオーバーの確率が下がる。最低1～。標準:10
 
 // --- ゲームオーバー判定条件①②関連の定数 ---
 const LOST_FRAMES_THRESHOLD = 30; // 条件① ライン消失時の猶予フレーム数（30フレーム＝約0.5秒）
@@ -184,6 +197,8 @@ resize();
 addEventListener("keyup",e=>keys[e.code]=0);
 
 function trySelectStar(mx, my){
+	// リプレイ中は選択禁止
+	if(game.mode === "replay") return;
 	//クリック・タップ時には近い星を特定、Spaceキー時は画面中央をデフォルトとする
 	const s = findStarAt(mx ?? canvas.width/2, my ?? canvas.height/2);
     if(!s) return;
@@ -199,7 +214,14 @@ function trySelectStar(mx, my){
     }
     speedMultiplier+=SPEED_STEP;
     if(s.lineId !== null)return;
-    if(game.selectedStars.length>0 && s.color !== game.selectedStars[0].color)return;
+	//計画外推進の赤アラートは、ゲーム開始直後のライン0本時には出さない
+	if(game.selectedStars.length>0 && s.color !== game.selectedStars[0].color){
+	    if(game.lines.length>0){
+	        game.alertTimer=30;
+	        game.alertStar=s;
+	    }
+	    return;
+	}
     // 選択済みの星に追加
     game.selectedStars.push(s);
     // 確定ロジック修正：既存のラインを保持しつつ、新しい星と繋ぐ
@@ -240,6 +262,8 @@ function createSprites(){
 }
 
 function update(dt){
+	if(game.alertTimer>0) game.alertTimer--;
+	if(game.gameOverTimer>0) game.gameOverTimer--;
 	if(game.mode === "replay"){
 		if(game.replayLog.length > 0){
 			const state = game.replayLog.shift();
@@ -291,7 +315,7 @@ function update(dt){
 	}
 	applyBoost();
 	
-	// ゲームオーバー判定：既存ラインの末端星が視界外ならゲームオーバー
+	// ゲームオーバー判定①：既存ラインの末端星が視界外ならゲームオーバー
 	if(!game.isInvincible && (game.lines.length > 0 || game.selectedStars.length > 0)){
 		let lastStar = null;
 
@@ -316,10 +340,11 @@ function update(dt){
 	    if(!visible){
 	        game.lostFrames++;
 	        if(game.lostFrames > LOST_FRAMES_THRESHOLD){
-	        	game.finalElapsedSec = ((Date.now() - game.startTime) / 1000) | 0;
-	            updateURL();
-	            alert("GAME OVER: Lost Navigation Lock! Warp Failed!");
-	            game.mode = "replay";
+				game.finalElapsedSec = ((Date.now() - game.startTime) / 1000) | 0;
+				updateURL();
+				game.gameOverMessage="STAR SYSTEM LOST!";
+				game.gameOverTimer=540; //ゲームオーバータイマー①
+				game.mode="replay";
 	        }
 	    }else{
 	        game.lostFrames = 0;
@@ -327,8 +352,8 @@ function update(dt){
 	}
 
 	// 2D投影上の線分交差判定
-	const linesToCheck = [...game.lines];
-	if(game.selectedStars.length > 1) linesToCheck.push({ points: game.selectedStars });
+	const linesToCheck = game.lines.slice(-MAX_VISIBLE_LINES);
+    if(game.selectedStars.length > 1) linesToCheck.push({ points: game.selectedStars });
 	const segments = [];
 	for(const line of linesToCheck){
 		for(let i=0; i<line.points.length-1; i++){
@@ -350,12 +375,13 @@ function update(dt){
 
 	if(collisionFound && !game.isInvincible){
 		game.collisionFrames++;
-		// 指定フレーム数分の交差が続いたらアウト
+		// ゲームオーバー判定①：指定フレーム数分の交差が続いたらゲームオーバー
 		if(game.collisionFrames > COLLISION_THRESHOLD){
 			game.finalElapsedSec = ((Date.now() - game.startTime) / 1000) | 0;
 			updateURL();
-			alert("GAME OVER: Star Gravity Line Cross! Warp Failed!");
-			game.mode = "replay";
+			game.gameOverMessage="STAR LINE COLLISION!";
+			game.gameOverTimer=540; //ゲームオーバータイマー②
+			game.mode="replay";
 		}
 	} else {
 		game.collisionFrames = 0;
@@ -546,7 +572,30 @@ function render(t){
 	    prevSx=sx; prevSy=sy;
 	}
 
-	if(game.targetStar){
+	//計画外推進の赤アラート
+	if(game.alertTimer>0 && game.alertStar){
+	    const p=project(game.alertStar);
+
+	    if(p){
+	    	//赤円塗り＆2回点滅
+	        const visible=
+	            game.alertTimer>=21 ||
+	            (game.alertTimer<=15 && game.alertTimer>=1);
+
+	        if(visible){
+	            ctx.fillStyle="rgba(255,0,0,0.25)";
+	            ctx.beginPath();
+	            ctx.arc(p.x,p.y,game.alertStar.size*10,0,Math.PI*2);
+	            ctx.fill();
+
+	            ctx.strokeStyle="#ff0000";
+	            ctx.lineWidth=2;
+	            ctx.beginPath();
+	            ctx.arc(p.x,p.y,game.alertStar.size*10,0,Math.PI*2);
+	            ctx.stroke();
+	        }
+	    }
+	}else if(game.targetStar){
 	    ctx.strokeStyle="#fff";
 	    ctx.lineWidth=1;
 	    ctx.beginPath();
@@ -577,19 +626,39 @@ function render(t){
 	drawMetalText(`${game.distance * 100 | 0} LIGHT YEARS`,20,70); //光年（航行した総距離 * 100）※外連味で100倍している
 	drawMetalText(`${game.lines.length} STAR LINES`,20,100); //星系（リンク数）
 
-	if(game.mode === "replay"){
-		ctx.fillStyle = "#ff0000";
-		ctx.fillText("REPLAYING...", 20, 140);
+	//「20,140」はネガティブイベント表示に使う
+	if(game.alertTimer>0){
+	    const visible=
+	        game.alertTimer>=21 ||
+	        (game.alertTimer<=15 && game.alertTimer>=1);
+
+	    if(visible){
+	        ctx.fillStyle="#ff0000";
+	        ctx.fillText("UNPLANNED SWING-BY!",20,140);
+	    }
 	}
+	
+	if(game.gameOverTimer>0){
+	    ctx.fillStyle="#ff0000";
+	    ctx.fillText(game.gameOverMessage,20,140); //ゲームオーバー①②メッセージ
+	}
+
+	// リプレイ表示
+	if(game.mode === "replay"){
+		ctx.fillStyle = "#ffff00";
+		ctx.fillText("REPLAYING...", 20, 170);
+	}
+
+	// 無敵モード
 	if(game.isInvincible){
 		ctx.fillStyle = "#ffff00";
-		ctx.fillText("INVINCIBLE MODE: ON", 20, 140 + (game.mode === "replay" ? 30 : 0));
+		ctx.fillText("INVINCIBLE MODE: ON", 20, 200);
 	}
 
 	// 確定済みラインの描画
 	ctx.strokeStyle="#88aaff";
     ctx.lineWidth=3;
-    for(const line of game.lines){
+    for(const line of game.lines.slice(-MAX_VISIBLE_LINES)){
         ctx.beginPath();
         let started = false; // 線を開始したかどうかのフラグ
         
@@ -715,6 +784,22 @@ function render(t){
 	mCtx.fillStyle = "#00ff66";
 	const self = iso(0, 0, 0);
 	mCtx.fillRect(self.x-3, self.y-3, 6, 6);
+
+	// ゲームオーバー演出（timer 540=9秒）
+	// 暗転効果を出すためにこの関数内の一番最後に記述している
+	if(game.gameOverTimer > 0){
+		const t = 540 - game.gameOverTimer; // 経過フレーム
+		if(t < 180) { // 0～3秒：赤フラッシュ
+			ctx.fillStyle = `rgba(255, 0, 0, ${0.4 * (1 - t / 180)})`;
+		} else if(t < 360) { // 3～6秒：暗転維持（黒・少し透過）
+			ctx.fillStyle = "rgba(0, 0, 0, 0.8)";
+		} else if(t < 480) { // 6～8秒：復帰
+			ctx.fillStyle = `rgba(0, 0, 0, ${(480 - t) / 120})`;
+		} else { // 8秒以降：透明（描画なし）
+			ctx.fillStyle = "rgba(0, 0, 0, 0)";
+		}
+		ctx.fillRect(0, 0, canvas.width, canvas.height);
+	}
 
 }
 
@@ -859,13 +944,8 @@ function loop(now){
     requestAnimationFrame(loop);
 }
 
-//特定の星画像
-const SPECIAL_STARS_CONFIG = {
-    3999: "./img/id3999.png",
-    500:  "./img/id500.png",
-    1500: "./img/id1500.png",
-    2500: "./img/id2500.png"
-};
+// 星の描画用キャッシュを初期化
+// ※SPECIAL_STARS_CONFIG等の全設定が確定した後に呼び出す必要があるため、ここに配置
 createSprites();
 
 function createStars(){
