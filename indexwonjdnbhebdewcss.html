@@ -95,6 +95,7 @@ const game={
     ready:false, 
     collisionFrames:0, // 交差フレーム数カウンター
 	startTime:Date.now(),
+	finalElapsedSec:0,
     distance:0,
     replayLog:[], // リプレイ用のカメラログ
     mode:"playing", // playing / replay
@@ -280,55 +281,46 @@ function update(dt){
 		c.x+=mx; c.y+=my; c.z+=mz;
 		game.distance+=Math.hypot(mx,my,mz);
 	} else {
-		game.startTime = Date.now();
+		if(game.distance === 0){
+			game.startTime = Date.now();
+		}
 		game.distance = 0;
 	}
 	applyBoost();
 	
-	// ゲームオーバー判定：全てのラインが画面外（可視範囲外）ならゲームオーバー
-	let anyLineVisible = false;
-	const allLines = [...game.lines];
-	if(game.selectedStars.length > 0) allLines.push({ points: game.selectedStars });
+	// ゲームオーバー判定：既存ラインの末端星が視界外ならゲームオーバー
+	if(!game.isInvincible && (game.lines.length > 0 || game.selectedStars.length > 0)){
+		let lastStar = null;
 
-	// ラインが画面内にあるか判定
-	for(const line of allLines){
-		for(let i=0; i<line.points.length-1; i++){
-			const p1 = project(line.points[i]);
-			const p2 = project(line.points[i+1]);
-
-			// どちらか一方が画面内にあれば生存
-			const isP1In = p1 && p1.x >= 0 && p1.x <= canvas.width && p1.y >= 0 && p1.y <= canvas.height;
-			const isP2In = p2 && p2.x >= 0 && p2.x <= canvas.width && p2.y >= 0 && p2.y <= canvas.height;
-			
-			if(isP1In || isP2In){
-				anyLineVisible = true;
-				break;
-			}
-
-			// 両方画面外でも、線分が画面を横切っているか（簡易中点チェック）
-			if(p1 && p2){
-				const mid = {x: (p1.x + p2.x)/2, y: (p1.y + p2.y)/2};
-				if(mid.x >= 0 && mid.x <= canvas.width && mid.y >= 0 && mid.y <= canvas.height){
-					anyLineVisible = true;
-					break;
-				}
-			}
-		}
-		if(anyLineVisible) break;
-	}
-
-	// フレームの猶予判定
-	if(!game.isInvincible && game.lines.length > 0){
-		if(!anyLineVisible){
-			game.lostFrames++;
-			if(game.lostFrames > LOST_FRAMES_THRESHOLD){ 
-				updateURL();
-				alert("GAME OVER: Star Gravity Line Lost! Warp Failed!");
-				game.mode = "replay";
-			}
+		if(game.selectedStars.length > 0){
+		    lastStar = game.selectedStars[game.selectedStars.length - 1];
 		}else{
-			game.lostFrames = 0;
+		    const lastLine = game.lines[game.lines.length - 1];
+		    lastStar = lastLine.points[lastLine.points.length - 1];
 		}
+
+	    const p = project(lastStar);
+
+	    let visible = false;
+	    if(p){
+	        visible =
+	            p.x >= 0 &&
+	            p.x <= canvas.width &&
+	            p.y >= 0 &&
+	            p.y <= canvas.height;
+	    }
+
+	    if(!visible){
+	        game.lostFrames++;
+	        if(game.lostFrames > LOST_FRAMES_THRESHOLD){
+	        	game.finalElapsedSec = ((Date.now() - game.startTime) / 1000) | 0;
+	            updateURL();
+	            alert("GAME OVER: Lost Navigation Lock! Warp Failed!");
+	            game.mode = "replay";
+	        }
+	    }else{
+	        game.lostFrames = 0;
+	    }
 	}
 
 	// 2D投影上の線分交差判定
@@ -357,6 +349,7 @@ function update(dt){
 		game.collisionFrames++;
 		// 指定フレーム数分の交差が続いたらアウト
 		if(game.collisionFrames > COLLISION_THRESHOLD){
+			game.finalElapsedSec = ((Date.now() - game.startTime) / 1000) | 0;
 			updateURL();
 			alert("GAME OVER: Star Gravity Line Cross! Warp Failed!");
 			game.mode = "replay";
@@ -570,7 +563,12 @@ function render(t){
 	//drawMetalText(`ACTIVE STAR : ${game.selectedStars.length}`,20,20);
 
 	// スコア表示
-	const elapsed = ((Date.now() - game.startTime) / 1000) | 0;
+	let elapsed = 0;
+	if(game.mode === "replay"){
+	    elapsed = game.finalElapsedSec ?? 0; //リプレイ中は前回のDAYS表示を保持
+	}else{
+	    elapsed = ((Date.now() - game.startTime) / 1000) | 0;
+	}
 	drawMetalText(`UNIVERSE ID : ${SEED}`,20,10); //SEEDを画面上はユニバースIDとして表示する
 	drawMetalText(`${elapsed} DAYS`,20,40); //ゲーム内での日数（実時間での秒数）
 	drawMetalText(`${game.distance * 100 | 0} LIGHT YEARS`,20,70); //光年（航行した総距離 * 100）※外連味で100倍している
