@@ -196,9 +196,12 @@ const MAX_VISIBLE_LINES = 10;   // 表示を残しておく最新のラインの
 // --- ゲームオーバー判定条件①②関連の定数 ---
 const LOST_FRAMES_THRESHOLD = 30; // 条件① ライン消失時の猶予フレーム数（30フレーム＝約0.5秒）
 const COLLISION_THRESHOLD = 1;    // 条件② ライン交差判定猶予: 衝突とみなすまでのフレーム数。大きいほど「かすり」を許容。標準:1
-const COLLISION_MARGIN = 0.1;     // 条件② ライン交差判定の厳密さ: 0に近いほど厳格。大きいほど重なりに対しても判定が緩くなります。標準:0.1
+const COLLISION_MARGIN = 0;     // 条件② ライン交差判定の厳密さ: 0に近いほど厳格。大きいほど重なりに対しても判定が緩くなります。標準:0.1
 
 const sprites={};
+//スペシャル星アイコンキャッシュ
+const specialIcons={};
+
 //ミニマップ背景
 const minimapBg=new Image();
 minimapBg.src="./img/space.jpg";
@@ -496,7 +499,7 @@ function render(t){
 		if(rz2 < 10) continue;
 		const sx=centerX+rx*FOCAL/rz2;
 		const sy=centerY-ry*FOCAL/rz2;
-		// 特殊な星でなければ、画面外のものはスキップする
+		// スペシャル星でなければ、画面外のものはスキップする
 		if(!s.isSpecial && (sx < -200 || sx > canvas.width+200 || sy < -200 || sy > canvas.height+200)) continue;
 
         const crossDist=Math.hypot(sx-centerX,sy-centerY);
@@ -512,8 +515,10 @@ function render(t){
         const scale=Math.min(2,FOCAL/rz2);
         const sprite=sprites[s.color][s.size];
 
-        ctx.globalAlpha=.6+.4*Math.sin(t*s.twinkleSpeed+s.phase);
-
+        //スペシャル星は非点滅
+        // 参考：点滅する場合）ctx.globalAlpha=.6+.4*Math.sin(t*s.twinkleSpeed+s.phase);
+        ctx.globalAlpha=s.isSpecial ? 1 : .6+.4*Math.sin(t*s.twinkleSpeed+s.phase);
+		
         const w=Math.min(100, Math.max(1,sprite.width*scale*STAR_RENDER_SCALE));
         const h=Math.min(100,Math.max(1,sprite.height*scale*STAR_RENDER_SCALE));
 
@@ -521,11 +526,15 @@ function render(t){
 		ctx.globalCompositeOperation="lighter";
 		ctx.drawImage(sprite,sx-w/2,sy-h/2,w,h);
 		
-		//特定の星
+		//スペシャル星
 		if(s.isSpecial && s.icon && s.icon.complete){
 			// 画面内なら直接描画
 			if(sx > 0 && sx < canvas.width && sy > 0 && sy < canvas.height){
-				ctx.drawImage(s.icon, sx-w/2, sy-h/2, w, h);
+		        ctx.save();
+		        ctx.translate(sx,sy);
+		        ctx.rotate(t*0.02); //回転率
+		        ctx.drawImage(s.icon,-w*0.9,-h/2,w*1.8,h); //横1.8倍
+		        ctx.restore();
 			} else {
 				// 画面外なら画面端にガイド（矢印）を表示
 				const angle = Math.atan2(sy - centerY, sx - centerX);
@@ -563,7 +572,13 @@ function render(t){
 
 	//毎フレームのカメラ位置と姿勢（yaw, pitch）を replayLog に記録します
 	game.targetStar=bestStar;
-	game.replayLog.push({x:c.x, y:c.y, z:c.z, yaw:c.yaw, pitch:c.pitch});
+	if(game.mode !== "replay"){
+		game.replayLog.push({x:c.x, y:c.y, z:c.z, yaw:c.yaw, pitch:c.pitch});
+		//直近10万フレーム≒28分のみを記録
+		if(game.replayLog.length>100000){
+			game.replayLog.shift();
+		}
+	}
     ctx.globalAlpha=1;
 
     ctx.strokeStyle="rgba(255,255,255,.8)";
@@ -682,9 +697,14 @@ function render(t){
 	}
 
 	// リプレイ表示
-	if(game.mode === "replay"){
-		ctx.fillStyle = "#ffff00";
-		ctx.fillText("REPLAYING...", 20, 200);
+	if(game.mode==="replay"){
+		if(game.replayLog.length>0){
+			ctx.fillStyle="#ffff00";
+			ctx.fillText("REPLAYING...",20,200);
+		}else{
+			ctx.fillStyle="#00ff66";
+			ctx.fillText("REPLAY FINISHED",20,200);
+		}
 	}
 
 	// 無敵（亜空間）モード
@@ -792,10 +812,10 @@ function render(t){
 	});
 	mCtx.stroke();
 	// 星の描画
-	for(let i=0; i<game.stars.length; i++){ // 1. すべての星をループさせる（もしくは間引いた上で特殊星を別途処理する）
+	for(let i=0; i<game.stars.length; i++){ // 1. すべての星をループさせる（もしくは間引いた上でスペシャル星を別途処理する）
 	    const s = game.stars[i];
         
-        // 2. 特殊な星以外は、間引き処理を行う（処理負荷対策）
+        // 2. スペシャル星以外は、間引き処理を行う（処理負荷対策）
         if(!s.isSpecial && i % 100 !== 0) continue; 
 
 	    let dx = (s.x-c.x+HALF_SPACE)%SPACE_SIZE; if(dx<0)dx+=SPACE_SIZE; dx-=HALF_SPACE;
@@ -805,14 +825,19 @@ function render(t){
 	    
 	    if(pos.x > 10 && pos.x < 140 && pos.y > 10 && pos.y < 140) {
 	        if(s.isSpecial) {
-	            mCtx.fillStyle = "#00ff66";
+	            // 発見済みスペシャル星はミニマップ上で色変更
+	            if(game.specialStarsFound.includes(s.id)){
+	                mCtx.fillStyle="#ffcc00"; //発見（選択）したら金色
+	            }else{
+	                mCtx.fillStyle="#00ff66"; //未発見は緑
+	            }
 				// サイズを 4x4 で描画
-                mCtx.fillRect(pos.x-1, pos.y-1, 4, 4);
+	            mCtx.fillRect(pos.x-1, pos.y-1, 4, 4);
 				// さらに強調するために、中心に白いドットを重ねて「星の芯」を表現
-                mCtx.fillStyle = "#fff";
-                mCtx.fillRect(pos.x, pos.y, 2, 2);
+	            mCtx.fillStyle="#fff";
+	            mCtx.fillRect(pos.x, pos.y, 2, 2);
 	        } else {
-	            mCtx.fillStyle = "#fff";
+	            mCtx.fillStyle="#fff";
 	            mCtx.fillRect(pos.x, pos.y, 2, 2);
 	        }
 	    }
@@ -845,18 +870,44 @@ function render(t){
 const images = [];
 let imagesLoaded = false;
 function loadImages(){
-    const promises = IMAGE_CONFIG.map((conf, index) => {
-        const img = new Image();
-        images[index] = img;
-        img.src = conf.src;
-        return new Promise(res => {
-            img.onload = () => res(true);
-            img.onerror = () => res(false);
+    const promises=IMAGE_CONFIG.map((conf,index)=>{
+        const img=new Image();
+        images[index]=img;
+        img.src=conf.src;
+        return new Promise(res=>{
+            img.onload=()=>res(true);
+            img.onerror=()=>res(false);
         });
     });
-    Promise.all(promises).then(() => { imagesLoaded = true; });
+    return Promise.all(promises);
 }
-loadImages();
+
+//スペシャル星アイコン事前ロード
+function loadSpecialIcons(){
+    const promises=[];
+    for(const id in SPECIAL_STARS_CONFIG){
+        const img=new Image();
+        specialIcons[id]=img;
+        img.src=SPECIAL_STARS_CONFIG[id];
+        promises.push(
+            new Promise(res=>{
+                img.onload=()=>res(true);
+                img.onerror=()=>{
+                    delete specialIcons[id];
+                    res(false);
+                };
+            })
+        );
+    }
+    return Promise.all(promises);
+}
+
+Promise.all([
+    loadImages(),
+    loadSpecialIcons()
+]).then(()=>{
+    imagesLoaded=true;
+});
 
 //レイヤーを消去する処理
 function hideGuide(){ document.getElementById("guide-layer").style.display = "none"; }
@@ -886,12 +937,7 @@ canvas.addEventListener("pointerdown", (e) => {
         trySelectStar(x, y);
     }
 }, {passive: false});
-canvas.addEventListener("touchstart", (e) => {
-    e.preventDefault(); // スクロール等のブラウザ動作を防止
-    if(document.getElementById("guide-layer").style.display === "none") {
-        trySelectStar();
-    }
-}, {passive: false}); // passiveをfalseに設定
+
 
 //アナログパッド
 const pad = document.getElementById("pad-area");
@@ -995,23 +1041,16 @@ function createStars(){
         if(id >= STAR_COUNT) console.warn(`警告: 星ID ${id} は範囲外です。`);
     }
     for(let i=0;i<STAR_COUNT;i++){
-
         const mag=rand();
-
         const x=randRange(-HALF_SPACE,HALF_SPACE);
         const y=randRange(-HALF_SPACE,HALF_SPACE);
         const z=randRange(-HALF_SPACE,HALF_SPACE);
-
         const size=1+((mag*STAR_BASE_SIZE)|0);
         const color=COLORS[randInt(0,COLORS.length-1)];
 
-        const isSpecial = SPECIAL_STARS_CONFIG.hasOwnProperty(i);
-        let icon = null;
-        if(isSpecial){
-            icon = new Image();
-            icon.src = SPECIAL_STARS_CONFIG[i];
-            icon.onerror = () => { icon = null; }; // 読み込み失敗時はアイコンを無効化し、通常の星として描画。矢印ガイドもなく、ミニマップ上も通常表示
-        }
+		const isSpecial=SPECIAL_STARS_CONFIG.hasOwnProperty(i);
+		// 読み込み失敗時はアイコンを無効化し、通常の星として描画。矢印ガイドもなく、ミニマップ上も通常表示
+		const icon=isSpecial ? specialIcons[i] ?? null : null;
 
 		game.stars.push({
 			id:i, //スペシャル星収集用
