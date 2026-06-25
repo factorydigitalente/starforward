@@ -73,9 +73,13 @@ canvas{display:block;width:100%;height:100%}
         align-items:center;
     }
 }
-/* スタートボタン・ヘルプボタンのスマホ縦型環境用：サイズと位置を調整 */
+/* スタートボタン・コンフィグボタン・ヘルプボタンのスマホ縦型環境用：サイズと位置を調整 */
 @media (orientation: portrait) {
     #start-btn {
+        padding: 20px 40px;
+        font-size: 1.5em;
+    }
+    #plus-btn {
         padding: 20px 40px;
         font-size: 1.5em;
     }
@@ -87,25 +91,51 @@ canvas{display:block;width:100%;height:100%}
 
 /* デフォルト（PC・横長環境用）：中央配置でメタリックな立体ボタン */
 #start-btn {
+    padding: 10px 30px;
+    cursor: pointer;
+    background: #000;
+    color: #00bfff; /* ネオンブルーの文字 */
+    border: 2px solid #00bfff; /* ネオンブルーの枠線 */
+    border-radius: 8px;
+    font-size: 1.1em;
+    font-weight: bold;
+    text-shadow: 0 0 8px rgba(0, 191, 255, 0.8);
+    box-shadow: 0 0 10px rgba(0, 191, 255, 0.3);
+    transition: all 0.2s;
+    /* 既存のflex配置を維持 */
+    height: 100%;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+#start-btn:hover {
+    background: rgba(0, 191, 255, 0.1);
+    box-shadow: 0 0 20px rgba(0, 191, 255, 0.6);
+}
+#start-btn:active {
+    transform: translateY(2px);
+    background: #00bfff;
+    color: #fff;
+}
+
+#plus-btn {
     padding: 8px 20px;
     font-size: 1.1em;
     height: 100%;
-    line-height:1;
-    display:flex;
-    align-items:center;
-    justify-content:center;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     cursor: pointer;
-    background: linear-gradient(180deg, #555 0%, #222 50%, #000 100%);
+    background: linear-gradient(180deg, #333 0%, #111 100%);
     color: #fff;
     border: 2px solid #aaa;
     border-radius: 8px;
     box-shadow: 0 4px 0 #000, 0 6px 10px rgba(0,0,0,0.5);
     text-shadow: 1px 1px 2px #000;
-    transition: box-shadow 0.1s;
 }
-
-/* 押したときのアクション */
-#start-btn:active {
+#plus-btn:active {
     transform: translateY(2px);
     box-shadow: 0 1px 0 #000;
 }
@@ -130,21 +160,20 @@ canvas{display:block;width:100%;height:100%}
     transform: translateY(2px);
     box-shadow:0 1px 0 #000;
 }
-/* 戻るボタン */
-#back-btn {
-    position: absolute; top: 20px; right: 20px; z-index: 100;
-    width: 50px; height: 50px; cursor: pointer; display: none;
-    background: linear-gradient(135deg, #555 0%, #222 50%, #000 100%);
-    border: 2px solid #aaa; border-radius: 8px;
-    box-shadow: 2px 2px 5px #000;
+
+/* モーダル本体 */
+#config-modal {
+    display: none;
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    z-index: 40;
+    background: rgba(0, 0, 0, 0.9);
 }
-#back-btn::after {
-    content: ""; position: absolute; left: 18px; top: 12px;
-    width: 20px; height: 20px;
-    border-top: 4px solid #fff; border-right: 4px solid #fff;
-    transform: rotate(-135deg);
+#config-content {
+    margin-top: 80px;
+    padding: 20px;
 }
-#back-btn:active { background: #333; transform: scale(0.95); }
 
 #pad-area{
     position:absolute;
@@ -257,6 +286,168 @@ canvas{display:block;width:100%;height:100%}
     #help-portrait { display: block; }
     #help-landscape { display: none; }
 }
+
+/* コンフィグモーダル */
+#config-modal {
+    display: none;
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    z-index: 40;
+    background: rgba(0, 0, 0, 0.9);
+}
+/* コンフィグモーダルの背景切り替え */
+#config-landscape {
+    background: url('./img/config_wide.jpg') center/cover no-repeat;
+}
+#config-portrait {
+    background: url('./img/config_tall.jpg') center/cover no-repeat;
+    display: none;
+}
+/* スマホ縦型環境用 */
+@media (orientation: portrait) {
+    #config-portrait { display: block; }
+    #config-landscape { display: none; }
+}
+#config-content {
+    position: relative; /* 背景と重ねるために必要 */
+    z-index: 1;
+    margin-top: 100px;
+    padding: 20px;
+    color: #fff;
+    text-align: center;
+    font-family: Arial, sans-serif;
+    pointer-events: auto; /* コンテンツ自体はクリック可能に */
+}
+/* コンフィグの背景を全画面に配置 */
+.bg-img {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+}
+/* 補助テキスト用のスタイル */
+#config-content div:has(+ #apply-seed-btn) {
+    margin-bottom: 20px;
+}
+#config-current-seed {
+    font-size: 2em;
+    font-weight: bold;
+    margin: 10px 0;
+    color: #aaa;
+}
+#seed-input {
+    background: #111; /* 少し暗くしてネオンを引き立てる */
+    border: 1px solid #00ff66; /* 緑の枠線 */
+    color: #00ff66; /* 文字色を緑に */
+    padding: 10px;
+    font-size: 1.2em;
+    border-radius: 4px;
+    width: 200px;
+    text-align: center;
+    display: block;
+    margin: 10px auto;
+    box-shadow: 0 0 5px rgba(0, 255, 102, 0.3); /* ほのかな光の拡散 */
+    outline: none; /* フォーカス時のデフォルト枠線を消す */
+    transition: all 0.2s ease;
+}
+#seed-input:focus {
+    background: #000;
+    box-shadow: 0 0 10px rgba(0, 255, 102, 0.6); /* フォーカス時に輝きを増す */
+    border-color: #fff;
+}
+/* TRANSPORTボタン */
+#apply-seed-btn {
+    padding: 10px 30px;
+    cursor: pointer;
+    /* 背景を黒ベースにし、青い光彩を際立たせる */
+    background: #000;
+    color: #00bfff; /* ネオンブルーの文字 */
+    border: 2px solid #00bfff; /* ネオンブルーの枠線 */
+    border-radius: 8px;
+    font-size: 1.1em;
+    font-weight: bold;
+    text-shadow: 0 0 8px rgba(0, 191, 255, 0.8);
+    box-shadow: 0 0 10px rgba(0, 191, 255, 0.3);
+    transition: all 0.2s;
+}
+#apply-seed-btn:hover {
+    background: rgba(0, 191, 255, 0.1);
+    box-shadow: 0 0 20px rgba(0, 191, 255, 0.6);
+}
+#apply-seed-btn:active {
+    transform: translateY(2px);
+    background: #00bfff;
+    color: #fff;
+}
+
+/* 船内音楽サービス用 */
+.music-controller { margin-bottom: 40px; }
+.switch {
+    display: inline-block; padding: 10px 20px; border: 2px solid #aaa;
+    border-radius: 20px; cursor: pointer; background: #222;
+}
+.switch.active { border-color: #00ff66; color: #00ff66; }
+/* 音楽選択部分のスタイルを更新 */
+.selector {
+    margin-top: 10px;
+    font-size: 1.2em;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 20px;
+}
+#bgm-name {
+    /* 最長曲名「Success and Arrogance」＋余白を確保し、中央揃えで固定 */
+    display: inline-block;
+    min-width: 13em;
+    text-align: center;
+    color: #00ff66;
+    text-shadow: 0 0 5px rgba(0, 255, 102, 0.5);
+    font-weight: bold;
+}
+.nav-btn {
+    cursor: pointer;
+    user-select: none;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #aaa;
+    border-radius: 5px;
+    background: #222;
+    transition: all 0.1s;
+}
+.nav-btn:hover {
+    border-color: #00ff66;
+    color: #00ff66;
+}
+.nav-btn:active {
+    transform: translateY(2px);
+    background: #000;
+}
+
+/* 戻るボタンの共通スタイル（コンフィグ画面とゲーム画面で共有） */
+.modal-back-btn {
+    position: absolute; top: 20px; right: 20px; z-index: 100;
+    width: 50px; height: 50px; cursor: pointer;
+    background: linear-gradient(135deg, #555 0%, #222 50%, #000 100%);
+    border: 2px solid #aaa; border-radius: 8px;
+    box-shadow: 2px 2px 5px #000;
+}
+.modal-back-btn::after {
+    content: ""; position: absolute; left: 18px; top: 12px;
+    width: 20px; height: 20px;
+    border-top: 4px solid #fff; border-right: 4px solid #fff;
+    transform: rotate(-135deg);
+}
+.modal-back-btn:active { background: #333; transform: scale(0.95); }
+
+/* 個別の制御用（ゲーム画面内の戻るボタン用のみ display: none を保持） */
+#back-btn {
+    display: none;
+    z-index: 100; /* 必要に応じて調整 */
+}
 </style>
 </head>
 <body>
@@ -271,7 +462,7 @@ canvas{display:block;width:100%;height:100%}
         PLEASE TOUCH<br>OR PRESS ANY KEY
     </div>
 </div>
-<div id="back-btn" onclick="location.reload()"></div>
+<div id="back-btn" class="modal-back-btn" onclick="location.reload()"></div>
 <div id="title-modal">
 	<div class="star" style="top:10%; left:20%; animation-delay: 2s;"></div>
     <div class="star" style="top:40%; left:60%; animation-delay: 5s;"></div>
@@ -279,12 +470,42 @@ canvas{display:block;width:100%;height:100%}
 	<div id="bg-portrait" class="bg-img bg-anim"></div>
 	<div id="title-btn-group">
 	    <button id="start-btn" onclick="startGame()">START</button>
+		<button id="plus-btn" onclick="openPlus()">+</button>
 	    <button id="help-btn" onclick="showHelp()">?</button>
 	</div>
 </div>
 <div id="help-modal" onclick="hideHelp()">
     <div id="help-landscape" class="bg-img"></div>
     <div id="help-portrait" class="bg-img"></div>
+</div>
+<div id="config-modal">
+	<div id="config-landscape" class="bg-img bg-anim"></div>
+    <div id="config-portrait" class="bg-img bg-anim"></div>
+    <div class="modal-back-btn" onclick="hideConfig()"></div>
+    <div id="config-content">
+		<h2> - ONBOARD MUSIC SERVICE - </h2>
+	    <div class="music-controller">
+	        <div id="music-toggle" class="switch active" onclick="toggleMusic()">♪ ON</div>
+	        <div class="selector">
+	            <span class="nav-btn" onclick="changeBgm(-1)">◀</span>
+	            <span id="bgm-name">Interlude</span>
+	            <span class="nav-btn" onclick="changeBgm(1)">▶</span>
+	        </div>
+	    </div>
+	
+        <h2> - UNIVERSE GATE - </h2>
+        <div>CURRENT UNIVERSE ID</div>
+        <div id="config-current-seed">---</div>
+        
+        <div style="font-size: 1.5em; margin: 10px 0;">GO ↓ TO</div>
+        
+        <input type="number" id="seed-input" min="1" max="4200000000">
+        <div style="font-size: 0.8em; color: #888; margin-top: 5px;">
+            RANGE: 1 - 4,200,000,000
+        </div>
+        
+        <button id="apply-seed-btn" onclick="applyNewSeed()"> &gt;&gt;&gt; TRANSPORT &lt;&lt;&lt; </button>
+    </div>
 </div>
 <style>@keyframes blink { 50% { opacity: 0; } }</style>
 
@@ -353,24 +574,47 @@ const BG_OPACITY = 0.6;       //背景の基本透過率（0.0透明～1.0不透
 const PARALLAX_STRENGTH = 50; // 背景の視差効果：カメラ旋回時の背景のズレ量（0:固定、20-50:控えめ標準、100+:激しい）
 
 // --- 操作・移動関連の定数 ---
-const SCROLL_SPEED = 10;        // 基本スクロール速度。標準:50
+const SCROLL_SPEED = 20;        // 基本スクロール速度。標準:50
 const INITIAL_SPEED_MULT = 1.0; // 初期速度倍率
 const ROT_SPEED = 0.2;          // 回転速度: 視点の旋回速度。値を大きくすると操作が機敏になります
 const MOVE_SPEED = 100;         // 基本移動速度: 宇宙をZ/Xキーで移動するベースの速度
 const BOOST_MULT = 2;           // ブースト倍率: Z/Xキー押下時の加速係数（基本速度 × 本値）
 const MIN_SPEED = 0.5;          // 最小速度倍率: 星を接続する際の下限速度
-const SPEED_STEP = 0.2;         // 加速ステップ: 星を1つ繋ぐごとに加算される速度倍率
-const MAX_VISIBLE_LINES = 10;   // 表示を残しておく最新のラインの本数。少ないと交差ゲームオーバーの確率が下がる。最低1～。標準:10
+const SPEED_STEP = 0.3;         // 加速ステップ: 星を1つ繋ぐごとに加算される速度倍率
+const MAX_VISIBLE_LINES = 7;   // 表示を残しておく最新のラインの本数。少ないと交差ゲームオーバーの確率が下がる。最低1～。標準:10
 
 // --- ゲームオーバー判定条件①②関連の定数 ---
 const LOST_FRAMES_THRESHOLD = 30; // 条件① ライン消失時の猶予フレーム数（30フレーム＝約0.5秒）
 const COLLISION_THRESHOLD = 1;    // 条件② ライン交差判定猶予: 衝突とみなすまでのフレーム数。大きいほど「かすり」を許容。標準:1
-const COLLISION_MARGIN = 0;     // 条件② ライン交差判定の厳密さ: 0に近いほど厳格。大きいほど重なりに対しても判定が緩くなります。標準:0.1
+const COLLISION_MARGIN = 0.1;     // 条件② ライン交差判定の厳密さ: 0に近いほど厳格。大きいほど重なりに対しても判定が緩くなります。標準:0.1
 
 // --- BGM
-const BGM_TITLE_PATH = "./bgm/interlude.mp3";
+const BGM_TITLE_PATH = "./bgm/eternalsunset.mp3";
 const BGM_GAME_PATH = "./bgm/shootingstar.mp3"; 
 
+const BGM_LIST = [
+    { name: "Dream Isl", path: "./bgm/dreamisl.mp3" },
+    { name: "Ending Theme", path: "./bgm/endingtheme.mp3" },
+    { name: "Eternal Sunset", path: "./bgm/eternalsunset.mp3" },
+    { name: "Existance", path: "./bgm/existance.mp3" },
+    { name: "Far Away", path: "./bgm/faraway.mp3" },
+    { name: "Imaginative World", path: "./bgm/imaginativeworld.mp3" },
+    { name: "Interlude", path: "./bgm/interlude.mp3" },
+    { name: "Intro", path: "./bgm/otosintro.mp3" },
+    { name: "Leave of Defamation", path: "./bgm/leaveofdefamation.mp3" },
+    { name: "Midnight Revolution", path: "./bgm/midnightrevolution.mp3" },
+    { name: "Prepare", path: "./bgm/prepare.mp3" },
+    { name: "Quest", path: "./bgm/quest.mp3" },
+    { name: "Removal Work", path: "./bgm/removalwork.mp3" },
+    { name: "Reunion", path: "./bgm/reunion.mp3" },
+    { name: "Shooting Star", path: "./bgm/shootingstar.mp3" },
+    { name: "Softlanding", path: "./bgm/softlanding.mp3" },
+    { name: "Success and Arrogance", path: "./bgm/successandarrogance.mp3" },
+    { name: "Sunset", path: "./bgm/sunset.mp3" },
+    { name: "Warriors Rest", path: "./bgm/warriorsrest.mp3" }
+];
+let currentBgmIndex = 0;
+let isMusicEnabled = true;
 
 
 const sprites={};
@@ -382,7 +626,7 @@ const minimapBg=new Image();
 minimapBg.src="./img/space.jpg";
 
 //seed乱数生成基盤（Math.random完全排除）プロシージャル生成
-//seed設定可能範囲は1～4294967295までの整数（約42億通り）
+//seed設定可能範囲は1～4294967295までの整数（約42億通り）コンフィグ上は1～4200000000
 //seedは星の配置の位置と順序のみを決めている。数や広さはSTAR_COUNT、SPACE_SIZEに依存する
 let SEED = new URLSearchParams(location.search).get("seed") || 20260622;
 SEED = parseInt(SEED);
@@ -1098,6 +1342,7 @@ bgmGame.loop = true;
 // ページ読み込み時にタイトルBGMを開始
 // (注意: ブラウザの自動再生制限により、ユーザーが最初の「GUIDE」をクリックした後に再生させる必要があります)
 function startTitleBGM() {
+    if (!isMusicEnabled) return;
     bgmTitle.play().catch(e => console.log("Title BGM playback failed:", e));
 }
 
@@ -1115,7 +1360,11 @@ function startGame(){
 	// タイトルBGMを止めて、ゲームBGMを再生
     bgmTitle.pause();
     bgmTitle.currentTime = 0;
-    bgmGame.play().catch(e => console.log("Game BGM playback failed:", e));
+
+	// 現在の選曲(bgmGame.src)で再生開始
+    if(isMusicEnabled) {
+        bgmGame.play().catch(e => console.log("Game BGM playback failed:", e));
+    }
 }
 addEventListener("keydown",e=>{
     keys[e.code]=1;
@@ -1277,7 +1526,113 @@ function hideHelp() {
     document.getElementById("help-modal").style.display = "none";
 }
 
+// 「＋」ボタンでコンフィグを開く
+function openPlus() {
+    document.getElementById("config-modal").style.display = "block";
+    document.getElementById("config-current-seed").innerText = SEED;
+    document.getElementById("seed-input").value = SEED;
+    
+    // UIを現在の状態に合わせる
+    const toggle = document.getElementById("music-toggle");
+    toggle.classList.toggle("active", isMusicEnabled);
+    toggle.innerText = isMusicEnabled ? "♪ ON" : "♪ OFF";
+    
+    // 現在の曲名を確実に表示
+    document.getElementById("bgm-name").innerText = BGM_LIST[currentBgmIndex].name;
+
+    if (!bgmTitle.paused) {
+        bgmTitle.pause();
+    }
+	// 音楽ONなら試聴再生を開始
+    if (isMusicEnabled) {
+        bgmGame.play().catch(e => console.log("BGM preview failed:", e));
+    }
+}
+// コンフィグを閉じる
+function hideConfig() {
+    document.getElementById("config-modal").style.display = "none";
+	// コンフィグを閉じた際のBGMの処理
+	if (!game.started) {
+        // コンフィグで鳴らしたゲーム曲を止める
+        bgmGame.pause();
+        bgmGame.currentTime = 0;
+        
+        // タイトルBGMを再生（ONの状態なら）
+        if (isMusicEnabled) {
+            bgmTitle.play().catch(e => console.log("Title BGM resume failed:", e));
+        }
+    }
+}
+// コンフィグ内で新しいSEEDを適用してリロード
+function applyNewSeed() {
+    // 試聴用のゲーム曲を停止
+    bgmGame.pause();
+    bgmGame.currentTime = 0;
+
+    let newSeed = document.getElementById("seed-input").value;
+    let val = parseInt(newSeed);
+    if (isNaN(val) || val < 1) val = 1;
+    if (val > 4200000000) val = 4200000000;
+    
+    // URLを更新し、選曲インデックス(bgm)も付与してリロード
+    const url = new URL(window.location.href);
+    url.searchParams.set("seed", val);
+    url.searchParams.set("bgm", currentBgmIndex);
+    url.searchParams.set("bgm_on", isMusicEnabled ? "1" : "0");
+    
+    // タイトルBGMも念のため停止
+    bgmTitle.pause();
+    
+    window.location.href = url.toString();
+}
+
+/* 船内音楽サービス */
+function toggleMusic() {
+    isMusicEnabled = !isMusicEnabled;
+    const toggle = document.getElementById("music-toggle");
+    toggle.classList.toggle("active", isMusicEnabled);
+    toggle.innerText = isMusicEnabled ? "♪ ON" : "♪ OFF";
+    const url = new URL(window.location.href);
+    url.searchParams.set("bgm_on", isMusicEnabled ? "1" : "0");
+    history.replaceState(null, "", url.toString());
+    // 現在のBGM再生/停止
+    if(!isMusicEnabled) {
+        bgmGame.pause();
+    } else {
+        bgmGame.play();
+    }
+}
+function changeBgm(dir) {
+    currentBgmIndex = (currentBgmIndex + dir + BGM_LIST.length) % BGM_LIST.length;
+    const track = BGM_LIST[currentBgmIndex];
+    document.getElementById("bgm-name").innerText = track.name;
+    
+    // 音源の切り替え
+    bgmGame.src = track.path;
+	// 選曲時は試聴として再生する（ただしONの時のみ）
+    if(isMusicEnabled) {
+        bgmGame.play().catch(e => console.log("BGM preview failed:", e));
+    }
+}
+
+// --- URLパラメータからの選曲情報復元 ---
+const urlParams = new URLSearchParams(window.location.search);
+const savedMusicOn = urlParams.get("bgm_on");
+if (savedMusicOn !== null) isMusicEnabled = (savedMusicOn === "1");
+const savedBgm = urlParams.get("bgm");
+if (savedBgm !== null) {
+    currentBgmIndex = parseInt(savedBgm);
+    if (currentBgmIndex >= 0 && currentBgmIndex < BGM_LIST.length) {
+        const track = BGM_LIST[currentBgmIndex];
+        bgmGame.src = track.path;
+    }
+}
+
 createStars();
+// 初期化時にDOMに反映（コンフィグが開かれた時にも同じ処理をすると確実です）
+if (document.getElementById("bgm-name")) {
+    document.getElementById("bgm-name").innerText = BGM_LIST[currentBgmIndex].name;
+}
 requestAnimationFrame(loop);
 </script>
 </body>
