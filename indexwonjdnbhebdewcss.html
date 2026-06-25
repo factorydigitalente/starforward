@@ -492,7 +492,12 @@ canvas{display:block;width:100%;height:100%}
 	            <span class="nav-btn" onclick="changeBgm(1)">▶</span>
 	        </div>
 	    </div>
-	
+
+		<h2> - SOUND ALERT SYSTEM - </h2>
+		<div class="music-controller">
+		    <div id="alert-toggle" class="switch active" onclick="toggleAlert()">♪ ON</div>
+		</div>
+
         <h2> - UNIVERSE GATE - </h2>
         <div>CURRENT UNIVERSE ID</div>
         <div id="config-current-seed">---</div>
@@ -614,8 +619,8 @@ const BGM_LIST = [
     { name: "Warriors Rest", path: "./bgm/warriorsrest.mp3" }
 ];
 let currentBgmIndex = 0;
-let isMusicEnabled = true;
-
+let isMusicEnabled = true; //BGM
+let isAlertEnabled = true; //効果音
 
 const sprites={};
 //スペシャル星アイコンキャッシュ
@@ -664,7 +669,13 @@ function trySelectStar(mx, my){
     if(!s) return;
     // すでに固定化（lineIdがnullでない）された星は選択できない
     if(s.lineId !== null) return;
-    if(s.isSpecial && !game.specialStarsFound.includes(s.id)) game.specialStarsFound.push(s.id);
+    
+	let isSpecialSelection = false;
+    if(s.isSpecial && !game.specialStarsFound.includes(s.id)){
+        game.specialStarsFound.push(s.id);
+        playSE("special");
+        isSpecialSelection = true;
+    }
 
     // 現在操作中の星（selectedStars）に対する解除処理
     const i=game.selectedStars.indexOf(s);
@@ -680,11 +691,14 @@ function trySelectStar(mx, my){
 	    if(game.lines.length>0){
 	        game.alertTimer=30;
 	        game.alertStar=s;
+	        // スペシャル星選択時はアラート音を鳴らさない
+	        if(!isSpecialSelection) playSE("ng");
 	    }
 	    return;
 	}
     // 選択済みの星に追加
     game.selectedStars.push(s);
+    if(!isSpecialSelection) playSE("ok");
     // 確定ロジック修正：既存のラインを保持しつつ、新しい星と繋ぐ
     if(game.selectedStars.length >= 2){
         const newStar = game.selectedStars.pop();
@@ -806,6 +820,7 @@ function update(dt){
 					game.finalElapsedSec = ((Date.now() - game.startTime) / 1000) | 0;
 					updateURL();
 					game.gameOverMessage="STAR SYSTEM LOST!";
+					playSE("overLeave");
 					game.gameOverTimer=540; //ゲームオーバータイマー①
 					game.mode="gameover";
 				}
@@ -845,6 +860,7 @@ function update(dt){
 				game.finalElapsedSec = ((Date.now() - game.startTime) / 1000) | 0;
 				updateURL();
 				game.gameOverMessage="STAR LINE COLLISION!";
+				playSE("overCross");
 				game.gameOverTimer=540; //ゲームオーバータイマー②
 				game.mode="gameover";
 			}
@@ -1338,11 +1354,26 @@ Promise.all([
 //レイヤーを消去する処理
 function hideGuide(){ document.getElementById("guide-layer").style.display = "none"; }
 
-// BGM用の変数を宣言
+// BGM・SE用の変数を宣言
 const bgmTitle = new Audio(BGM_TITLE_PATH);
 bgmTitle.loop = true;
 const bgmGame = new Audio(BGM_GAME_PATH);
 bgmGame.loop = true;
+
+const SE = {
+    ok: new Audio("./se/se_star_ok.mp3"),
+    ng: new Audio("./se/se_star_ng.mp3"),
+    special: new Audio("./se/se_star_special.mp3"),
+    overLeave: new Audio("./se/se_over_leave.mp3"),
+    overCross: new Audio("./se/se_over_cross.mp3")
+};
+
+function playSE(key) {
+    if (isAlertEnabled && SE[key]) {
+        SE[key].currentTime = 0;
+        SE[key].play().catch(e => console.log("SE play failed:", e));
+    }
+}
 
 // ページ読み込み時にタイトルBGMを開始
 // (注意: ブラウザの自動再生制限により、ユーザーが最初の「GUIDE」をクリックした後に再生させる必要があります)
@@ -1542,6 +1573,10 @@ function openPlus() {
     toggle.classList.toggle("active", isMusicEnabled);
     toggle.innerText = isMusicEnabled ? "♪ ON" : "♪ OFF";
     
+    const alertToggle = document.getElementById("alert-toggle");
+    alertToggle.classList.toggle("active", isAlertEnabled);
+    alertToggle.innerText = isAlertEnabled ? "♪ ON" : "♪ OFF";
+    
     // 現在の曲名を確実に表示
     document.getElementById("bgm-name").innerText = BGM_LIST[currentBgmIndex].name;
 
@@ -1591,7 +1626,7 @@ function applyNewSeed() {
     window.location.href = url.toString();
 }
 
-/* 船内音楽サービス */
+// BGM船内音楽サービス
 function toggleMusic() {
     isMusicEnabled = !isMusicEnabled;
     const toggle = document.getElementById("music-toggle");
@@ -1607,6 +1642,18 @@ function toggleMusic() {
         bgmGame.play();
     }
 }
+// 効果音
+function toggleAlert() {
+    isAlertEnabled = !isAlertEnabled;
+    const toggle = document.getElementById("alert-toggle");
+    toggle.classList.toggle("active", isAlertEnabled);
+    toggle.innerText = isAlertEnabled ? "♪ ON" : "♪ OFF";
+    const url = new URL(window.location.href);
+    url.searchParams.set("alert_on", isAlertEnabled ? "1" : "0");
+    history.replaceState(null, "", url.toString());
+}
+
+// BGM選曲
 function changeBgm(dir) {
     currentBgmIndex = (currentBgmIndex + dir + BGM_LIST.length) % BGM_LIST.length;
     const track = BGM_LIST[currentBgmIndex];
@@ -1624,6 +1671,8 @@ function changeBgm(dir) {
 const urlParams = new URLSearchParams(window.location.search);
 const savedMusicOn = urlParams.get("bgm_on");
 if (savedMusicOn !== null) isMusicEnabled = (savedMusicOn === "1");
+const savedAlertOn = urlParams.get("alert_on");
+if (savedAlertOn !== null) isAlertEnabled = (savedAlertOn === "1");
 const savedBgm = urlParams.get("bgm");
 if (savedBgm !== null) {
     currentBgmIndex = parseInt(savedBgm);
