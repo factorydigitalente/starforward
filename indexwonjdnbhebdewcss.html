@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!-- Star Forward スターフォワード -->
-<!-- ver20260624 -->
+<!-- ver20260626 -->
 <!-- Copyright (C) 2026 Factory Digital Entertainment and Hironov Yazaki. -->
 <!-- このゲーム及び、ゲーム内の使用楽曲の著作権は全て、ファクトリー・デジタル・エンターテインメント、矢崎大信が有します。 -->
 <!-- 上記の著作権者に無断で、これらの著作物を出版・放送・演奏・複製・公開に使用することを禁じます。 -->
@@ -469,9 +469,9 @@ canvas{display:block;width:100%;height:100%}
 	<div id="bg-landscape" class="bg-img bg-anim"></div>
 	<div id="bg-portrait" class="bg-img bg-anim"></div>
 	<div id="title-btn-group">
-	    <button id="start-btn" onclick="startGame()">START</button>
-		<button id="plus-btn" onclick="openPlus()">+</button>
-	    <button id="help-btn" onclick="showHelp()">?</button>
+	    <button id="start-btn" onclick="playSE('effectGo'); startGame()">START</button>
+		<button id="plus-btn" onclick="playSE('effectSub'); openPlus()">+</button>
+	    <button id="help-btn" onclick="playSE('effectSub'); showHelp()">?</button>
 	</div>
 </div>
 <div id="help-modal" onclick="hideHelp()">
@@ -538,7 +538,10 @@ const game={
     alertTimer:0, // 異色星の赤アラート用
     alertStar:null, // 異色星の赤アラート用
     gameOverMessage:"",
-	gameOverTimer:0
+	gameOverTimer:0,
+	bestDays:0,
+	bestDist:0,
+	bestLines:0
 };
 const keys={};
 let speedMultiplier=1.0;
@@ -555,13 +558,13 @@ const IMG_COUNT = 128; // imgフォルダ内の背景画像総数
 
 //背景画像配列（表示の距離範囲つき）
 const IMAGE_CONFIG = [
-    { start: 3000, end: 20000, src: "img/img_001.png" },
-    { start: 30000, end: 60000, src: "img/img_002.png" },
-    { start: 100000, end: 150000, src: "img/img_003.png" },
-    { start: 220000, end: 300000, src: "img/img_004.png" },
-    { start: 400000, end: 500000, src: "img/img_005.png" },
-    { start: 650000, end: 800000, src: "img/img_006.png" },
-    { start: 1000000, end: 1200000, src: "img/img_007.png" }
+    { start: 3000, end: 10000, src: "img/img_001.png" },
+    { start: 20000, end: 40000, src: "img/img_002.png" },
+    { start: 60000, end: 90000, src: "img/img_003.png" },
+    { start: 120000, end: 160000, src: "img/img_004.png" },
+    { start: 200000, end: 250000, src: "img/img_005.png" },
+    { start: 310000, end: 370000, src: "img/img_006.png" },
+    { start: 4400000, end: 510000, src: "img/img_007.png" }
 ];
 
 //特定の星のIDと画像
@@ -899,8 +902,9 @@ function render(t){
     game.time=t;
 
 	//メタリックフォント（Windows：Segoe UI Bold、Android：Roboto Bold、iPhone：SF Pro を自動利用）
-    function drawMetalText(text,x,y){
-        const grad=ctx.createLinearGradient(0,y,0,y+24);
+	function drawMetalText(text,x,y,size=20){
+        ctx.font=`bold ${size}px Arial`;
+        const grad=ctx.createLinearGradient(0,y,0,y+size);
         grad.addColorStop(0,"#ffffff");
         grad.addColorStop(0.25,"#dddddd");
         grad.addColorStop(0.5,"#888888");
@@ -911,6 +915,27 @@ function render(t){
         ctx.strokeStyle="#222";
 
         ctx.shadowColor="rgba(255,255,255,0.4)";
+        ctx.shadowBlur=8;
+
+        ctx.strokeText(text,x,y);
+        ctx.fillStyle=grad;
+        ctx.fillText(text,x,y);
+
+        ctx.shadowBlur=0;
+    }
+
+	//ベスト表示用
+	function drawSubText(text,x,y,size=12){
+        ctx.font=`bold ${size}px Arial`;
+        const grad=ctx.createLinearGradient(0,y,0,y+size);
+		grad.addColorStop(0,"#aaaaaa");
+        grad.addColorStop(0.5,"#777777");
+        grad.addColorStop(1,"#444444");
+
+        ctx.lineWidth=3;
+        ctx.strokeStyle="#222";
+
+        ctx.shadowColor="rgba(255,255,255,0.2)";
         ctx.shadowBlur=8;
 
         ctx.strokeText(text,x,y);
@@ -1106,7 +1131,7 @@ function render(t){
 	ctx.font="bold 20px Arial";
 	ctx.textBaseline="top";
 	//最新の1つの選択星
-	//drawMetalText(`ACTIVE STAR : ${game.selectedStars.length}`,20,20);
+	//drawMetalText(`ACTIVE STAR : ${game.selectedStars.length}`,20,20,18);
 
 	// スコア表示
 	let elapsed = 0;
@@ -1115,17 +1140,25 @@ function render(t){
 	}else{
 	    elapsed = ((Date.now() - game.startTime) / 1000) | 0;
 	}
-	drawMetalText(`UNIVERSE ID : ${SEED}`,20,10); //SEEDを画面上はユニバースIDとして表示する
-	drawMetalText(`${elapsed} DAYS`,20,40); //ゲーム内での日数（実時間での秒数）
-	drawMetalText(`${game.distance * 100 | 0} LIGHT YEARS`,20,70); //光年（航行した総距離 * 100）※外連味で100倍している
-	drawMetalText(`${game.lines.length} STAR LINES`,20,100); //星系（リンク数）
-	drawMetalText(`${game.specialStarsFound.length} / ${Object.keys(SPECIAL_STARS_CONFIG).length} SPECIAL STARS`,20,130); //スペシャル星収集
+	//SEEDを画面上はユニバースIDとして表示する
+	drawMetalText(`UNIVERSE ID : ${SEED}`,20,10,16); 
+	//ゲーム内での日数（実時間での秒数）
+	drawMetalText(`${elapsed} DAYS`,20,40,16); 
+	drawSubText(`BEST: ${game.bestDays}`,30,57,10);
+	//光年（航行した総距離 * 100）※外連味で100倍している
+	drawMetalText(`${game.distance * 100 | 0} LIGHT YEARS`,20,70,16); 
+	drawSubText(`BEST: ${game.bestDist}`,30,87,10);
+	//星系（リンク数）
+	drawMetalText(`${game.lines.length} STAR LINES`,20,100,16); 
+	drawSubText(`BEST: ${game.bestLines}`,30,117,10);
+	//スペシャル星収集
+	drawMetalText(`${game.specialStarsFound.length} / ${Object.keys(SPECIAL_STARS_CONFIG).length} SPECIAL STARS`,20,130,16); 
 
 	//「20,170」はネガティブイベント表示に使う
 	if(game.alertTimer>0){
 	    const visible=
-	        game.alertTimer>=21 ||
-	        (game.alertTimer<=15 && game.alertTimer>=1);
+	        game.alertTimer>=2 ||
+	        (game.alertTimer<=5 && game.alertTimer>=1);
 
 	    if(visible){
 	        ctx.fillStyle="#ff0000";
@@ -1365,7 +1398,10 @@ const SE = {
     ng: new Audio("./se/se_star_ng.mp3"),
     special: new Audio("./se/se_star_special.mp3"),
     overLeave: new Audio("./se/se_over_leave.mp3"),
-    overCross: new Audio("./se/se_over_cross.mp3")
+    overCross: new Audio("./se/se_over_cross.mp3"),
+	effectGo: new Audio("./se/effect_go.mp3"),
+    effectSub: new Audio("./se/effect_sub.mp3"),
+    effectBack: new Audio("./se/effect_back.mp3")
 };
 
 function playSE(key) {
@@ -1418,8 +1454,8 @@ canvas.addEventListener("pointerdown", (e) => {
     if(document.getElementById("guide-layer").style.display === "none") {
         const rect = canvas.getBoundingClientRect();
         const x = e.clientX - rect.left, y = e.clientY - rect.top;
-        // 無敵隠しボタン判定：LIGHT YEARS (20, 70) の2文字目 'I' 付近
-        if (x > 30 && x < 50 && y > 70 && y < 90) game.isSubspace = !game.isSubspace;
+        // 無敵隠しボタン判定：LIGHT YEARS (20,70,16) の2文字目 'I' 付近
+        if (x > 40 && x < 55 && y > 75 && y < 85) game.isSubspace = !game.isSubspace;
         trySelectStar(x, y);
     }
 }, {passive: false});
@@ -1500,8 +1536,15 @@ function findStarAt(mx, my) {
 function updateURL(){
     const params = new URLSearchParams();
     params.set("seed", SEED);
-    params.set("dist", (game.distance | 0));
-    params.set("lines", game.lines.length);
+	const d = (game.distance * 100) | 0;
+    const l = game.lines.length;
+    const days = ((Date.now() - game.startTime) / 1000) | 0;
+    if(days > game.bestDays) game.bestDays = days;
+    if(d > game.bestDist) game.bestDist = d;
+    if(l > game.bestLines) game.bestLines = l;
+    params.set("bestdays", game.bestDays);
+    params.set("bestdist", game.bestDist);
+    params.set("bestlines", game.bestLines);
     history.replaceState(null, "", "?" + params.toString());
 }
 
@@ -1590,9 +1633,12 @@ function openPlus() {
 }
 // コンフィグを閉じる
 function hideConfig() {
+	playSE('effectBack');
     document.getElementById("config-modal").style.display = "none";
-	// コンフィグを閉じた際のBGMの処理
-	if (!game.started) {
+    const url = new URL(window.location.href);
+    url.searchParams.set("bgm", currentBgmIndex);
+    history.replaceState(null, "", url.toString());
+    if (!game.started) {
         // コンフィグで鳴らしたゲーム曲を止める
         bgmGame.pause();
         bgmGame.currentTime = 0;
@@ -1605,6 +1651,7 @@ function hideConfig() {
 }
 // コンフィグ内で新しいSEEDを適用してリロード
 function applyNewSeed() {
+	playSE('effectGo');
     // 試聴用のゲーム曲を停止
     bgmGame.pause();
     bgmGame.currentTime = 0;
@@ -1623,7 +1670,10 @@ function applyNewSeed() {
     // タイトルBGMも念のため停止
     bgmTitle.pause();
     
-    window.location.href = url.toString();
+	// 効果音が再生される時間を稼ぐために300ms待機してからリロード
+    setTimeout(() => {
+        window.location.href = url.toString();
+    }, 500);
 }
 
 // BGM船内音楽サービス
@@ -1683,6 +1733,10 @@ if (savedBgm !== null) {
 }
 
 createStars();
+// ベストスコアの読み込み
+game.bestDays = parseInt(urlParams.get("bestdays")) || 0;
+game.bestDist = parseInt(urlParams.get("bestdist")) || 0;
+game.bestLines = parseInt(urlParams.get("bestlines")) || 0;
 // 初期化時にDOMに反映（コンフィグが開かれた時にも同じ処理をすると確実です）
 if (document.getElementById("bgm-name")) {
     document.getElementById("bgm-name").innerText = BGM_LIST[currentBgmIndex].name;
