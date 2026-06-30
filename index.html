@@ -564,21 +564,28 @@ const IMG_COUNT = 128; // imgフォルダ内の背景画像総数
 
 //背景画像配列（表示の距離範囲つき）
 const IMAGE_CONFIG = [
-    { start: 3000, end: 10000, src: "img/img_001.png" },
-    { start: 20000, end: 40000, src: "img/img_002.png" },
-    { start: 60000, end: 90000, src: "img/img_003.png" },
-    { start: 120000, end: 160000, src: "img/img_004.png" },
-    { start: 200000, end: 250000, src: "img/img_005.png" },
-    { start: 310000, end: 370000, src: "img/img_006.png" },
-    { start: 440000, end: 510000, src: "img/img_007.png" }
+    { start: 3000, end: 10000, src: "img/img_01.png" },
+    { start: 20000, end: 30000, src: "img/img_02.png" },
+    { start: 40000, end: 50000, src: "img/img_03.png" },
+    { start: 60000, end: 80000, src: "img/img_04.png" },
+    { start: 90000, end: 110000, src: "img/img_05.png" },
+    { start: 120000, end: 140000, src: "img/img_06.png" },
+    { start: 150000, end: 175000, src: "img/img_07.png" },
+    { start: 200000, end: 225000, src: "img/img_08.png" },
+    { start: 235000, end: 260000, src: "img/img_09.png" },
+    { start: 280000, end: 305000, src: "img/img_10.png" },
+    { start: 325000, end: 350000, src: "img/img_11.png" },
+    { start: 370000, end: 400000, src: "img/img_12.png" },
+    { start: 420000, end: 450000, src: "img/img_13.png" },
+    { start: 470000, end: 500000, src: "img/img_14.png" }
 ];
 
 //特定の星のIDと画像
 const SPECIAL_STARS_CONFIG = {
-    3999: "./img/id3999.png",
-    500:  "./img/id500.png",
-    1500: "./img/id1500.png",
-    2500: "./img/id2500.png"
+    1:  "./img/id1.png",
+    2:  "./img/id2.png",
+    1000:  "./img/id1000.png",
+    3999: "./img/id3999.png"
 };
 
 const START_SCALE = 1.2;      //背景の開始時の大きさ。値を大きくすると、現れた時点ですでに大きい状態から始まります。標準:1
@@ -592,7 +599,7 @@ const SCROLL_SPEED = 30;        // 基本スクロール速度。標準:50
 const INITIAL_SPEED_MULT = 1.0; // 初期速度倍率
 const ROT_SPEED = 0.3;          // 回転速度: 視点の旋回速度。値を大きくすると操作が機敏になります
 const MOVE_SPEED = 100;         // 基本移動速度: 宇宙をZ/Xキーで移動するベースの速度
-const BOOST_MULT = 2;           // ブースト倍率: Z/Xキー押下時の加速係数（基本速度 × 本値）
+const BOOST_MULT = 10;           // ブースト倍率: Z/Xキー押下時の加速係数（基本速度 × 本値）
 const MIN_SPEED = 0.5;          // 最小速度倍率: 星を接続する際の下限速度
 const SPEED_STEP = 0.3;         // 加速ステップ: 星を1つ繋ぐごとに加算される速度倍率
 const MAX_VISIBLE_LINES = 6;   // 表示を残しておく最新のラインの本数。少ないと交差ゲームオーバーの確率が下がる。最低1～。標準:10
